@@ -3,9 +3,16 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _split_csv_env(var_name: str, default: str) -> list[str]:
+    return [value.strip() for value in os.environ.get(var_name, default).split(",") if value.strip()]
+
+
 SECRET_KEY = os.environ.get("SYNERGETIC_SECRET_KEY", "local-development-key-change-before-production")
 DEBUG = os.environ.get("SYNERGETIC_DEBUG", "1") == "1"
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get("SYNERGETIC_ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if host.strip()]
+ALLOWED_HOSTS = _split_csv_env("SYNERGETIC_ALLOWED_HOSTS", "127.0.0.1,localhost,*.vercel.app")
+CSRF_TRUSTED_ORIGINS = _split_csv_env("SYNERGETIC_CSRF_TRUSTED_ORIGINS", "https://localhost,https://127.0.0.1,https://*.vercel.app")
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
