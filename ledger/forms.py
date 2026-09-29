@@ -1,7 +1,9 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
 from django.forms import inlineformset_factory
 
-from .models import Account, ApprovalRule, BankAccount, BankStatementLine, Budget, Campus, CashSession, CostCentre, Document, FinancialPeriod, Voucher, VoucherLine
+from .models import Account, ApprovalRule, BankAccount, BankStatementLine, Budget, Campus, CashSession, CostCentre, Document, FinancialPeriod, Notification, Voucher, VoucherLine
 
 
 class DateInput(forms.DateInput):
@@ -72,6 +74,24 @@ class DocumentForm(forms.ModelForm):
         if ext not in allowed:
             raise forms.ValidationError("Upload PDF, spreadsheet, Word document or image files only.")
         return uploaded
+
+
+class NotificationForm(forms.ModelForm):
+    class Meta:
+        model = Notification
+        fields = ["recipient", "subject", "message", "voucher"]
+        widgets = {"message": forms.Textarea(attrs={"rows": 5})}
+
+
+class AccountUserCreationForm(UserCreationForm):
+    email = forms.EmailField(required=True)
+    first_name = forms.CharField(max_length=150)
+    last_name = forms.CharField(max_length=150)
+    is_staff = forms.BooleanField(required=False, label="Finance staff access")
+
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ["username", "first_name", "last_name", "email", "is_staff"]
 
 
 def model_form(model, fields, widgets=None):

@@ -9,10 +9,12 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <link rel="stylesheet" href="{% static 'ledger/css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'ledger/css/features.css' %}">
   {% block head %}{% endblock %}
 </head>
 <body>
 <div class="app-shell">
+  <input class="nav-toggle" type="checkbox" id="navToggle" aria-hidden="true">
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="{% url 'ledger-dashboard' %}"><span class="brand-mark"><i class="fa-solid fa-layer-group"></i></span><span><b>SYNERGETIC</b><small>ACCOUNTS</small></span></a>
     <div class="company-switch"><span class="company-avatar">SS</span><div><b>Synergetic Solutions</b><small>Primary company</small></div><i class="fa-solid fa-chevron-down"></i></div>
@@ -26,14 +28,17 @@
       <a class="{% if section == 'cash-bank' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=cash-bank"><i class="fa-solid fa-building-columns"></i>Cash &amp; bank</a>
       <a class="{% if section == 'budgets' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=budgets"><i class="fa-solid fa-bullseye"></i>Budgets</a>
       <a class="{% if section == 'documents' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=documents"><i class="fa-solid fa-folder-open"></i>Documents</a>
+      <a class="{% if section == 'tracking' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=tracking"><i class="fa-solid fa-route"></i>Tracking</a>
+      <a class="{% if section == 'notifications' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=notifications"><i class="fa-solid fa-inbox"></i>Notifications{% if unread_notifications %}<span class="nav-count">{{ unread_notifications }}</span>{% endif %}</a>
       <a class="{% if section == 'reports' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=reports"><i class="fa-solid fa-chart-simple"></i>Reports</a>
       <a class="{% if section == 'audit' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=audit"><i class="fa-solid fa-shield-halved"></i>Audit log</a>
+      <a class="{% if section == 'users' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=users"><i class="fa-solid fa-user-gear"></i>User accounts</a>
       <a class="{% if section == 'settings' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=settings"><i class="fa-solid fa-gear"></i>Setup</a>
     </nav>
     <div class="sidebar-foot"><span class="user-avatar">{{ request.user.username|first|upper }}</span><div><b>{{ request.user.get_full_name|default:request.user.username }}</b><small>Finance workspace</small></div><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button></form></div>
   </aside>
   <div class="workspace">
-    <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Open menu" aria-controls="sidebar" onclick="document.getElementById('sidebar').classList.toggle('open')"><i class="fa-solid fa-bars"></i></button><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="globalSearch" placeholder="Search this page"><kbd>⌘ K</kbd></div><div class="top-actions"><span class="live-pill"><i></i> PostgreSQL connected</span><button class="icon-button"><i class="fa-regular fa-bell"></i></button><a class="primary-button" href="{% url 'voucher-create' %}"><i class="fa-solid fa-plus"></i> New transaction</a></div></header>
+    <header class="topbar"><label class="menu-button" for="navToggle" aria-label="Open menu" aria-controls="sidebar"><i class="fa-solid fa-bars"></i></label><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="globalSearch" placeholder="Search this page"><kbd>⌘ K</kbd></div><div class="top-actions"><span class="live-pill"><i></i> PostgreSQL connected</span><button class="icon-button"><i class="fa-regular fa-bell"></i></button><a class="primary-button" href="{% url 'voucher-create' %}"><i class="fa-solid fa-plus"></i> New transaction</a></div></header>
     {% if messages %}<div class="message-stack">{% for message in messages %}<div class="message {{ message.tags }}"><i class="fa-solid fa-circle-check"></i>{{ message }}</div>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
   </div>

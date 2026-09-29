@@ -268,3 +268,20 @@ class Document(models.Model):
     @property
     def filename(self):
         return self.file.name.rsplit("/", 1)[-1]
+
+
+class Notification(models.Model):
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="sent_account_notifications")
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="received_account_notifications")
+    subject = models.CharField(max_length=180)
+    message = models.TextField()
+    voucher = models.ForeignKey(Voucher, on_delete=models.SET_NULL, null=True, blank=True, related_name="notifications")
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["recipient", "is_read", "created_at"])]
+
+    def __str__(self):
+        return self.subject

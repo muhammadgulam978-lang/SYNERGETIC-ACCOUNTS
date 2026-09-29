@@ -5,8 +5,8 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from ledger.models import BankAccount, BankStatementLine, Budget, CashSession, Voucher, VoucherLine
-from ledger.services import approve_voucher, ensure_setup, next_voucher_number, post_voucher, submit_voucher
+from ledger.models import Account, BankAccount, BankStatementLine, Budget, CashSession, Notification, Voucher, VoucherLine
+from ledger.services import DEFAULT_ACCOUNTS, approve_voucher, ensure_setup, next_voucher_number, post_voucher, submit_voucher
 
 
 class Command(BaseCommand):
@@ -22,6 +22,8 @@ class Command(BaseCommand):
         maker, _ = User.objects.get_or_create(username="accounts.maker", defaults={"first_name": "Accounts", "last_name": "Maker", "is_staff": True})
         maker.set_password(options["password"]); maker.save()
         campus, period, accounts = ensure_setup()
+        for code, name, kind, normal in DEFAULT_ACCOUNTS:
+            Account.objects.filter(code=code).update(name=name, account_type=kind, normal_balance=normal)
         BankAccount.objects.get_or_create(ledger_account=accounts["1100"], defaults={"campus": campus, "bank_name": "Primary Business Bank", "account_title": "Synergetic Solutions", "account_number": "PK00-SYNERGETIC-4488", "currency": "PKR"})
         Budget.objects.get_or_create(campus=campus, account=accounts["5100"], period=period, department="Operations", project="", cost_centre=None, defaults={"amount": Decimal("1200000")})
         today = timezone.localdate()
@@ -42,4 +44,6 @@ class Command(BaseCommand):
             submit_voucher(voucher, maker); approve_voucher(voucher, owner); post_voucher(voucher, owner)
         bank = BankAccount.objects.first()
         BankStatementLine.objects.get_or_create(bank_account=bank, transaction_date=today - timedelta(days=1), reference="BANK-UNMATCHED-001", defaults={"description": "Incoming transfer to review", "credit": Decimal("125000")})
+        Notification.objects.get_or_create(sender=maker, recipient=owner, subject="Bank line needs reconciliation", defaults={"message": "A new unmatched bank statement line is ready for review."})
+        Notification.objects.get_or_create(sender=owner, recipient=maker, subject="Monthly close checklist", defaults={"message": "Please verify supporting documents before the period close."})
         self.stdout.write(self.style.SUCCESS("Synergetic Accounts is ready. User: admin"))

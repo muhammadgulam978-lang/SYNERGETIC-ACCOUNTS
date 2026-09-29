@@ -28,5 +28,8 @@ Change the password from Django admin before real use. The secondary `accounts.m
 - Chart of accounts, party balances, budgets and financial periods
 - Cash closing and bank reconciliation
 - File uploads with voucher links and a document vault
+- Internal notification inbox/sent links and voucher references
+- End-to-end transaction tracking from creation through posting
+- Admin-controlled creation of new finance user accounts
 - Trial balance and general-ledger CSV exports
 - Immutable audit history and role-aware approval controls

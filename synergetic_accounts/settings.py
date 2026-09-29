@@ -10,7 +10,11 @@ def _split_csv_env(var_name: str, default: str) -> list[str]:
 
 SECRET_KEY = os.environ.get("SYNERGETIC_SECRET_KEY", "local-development-key-change-before-production")
 DEBUG = os.environ.get("SYNERGETIC_DEBUG", "1") == "1"
-ALLOWED_HOSTS = _split_csv_env("SYNERGETIC_ALLOWED_HOSTS", "127.0.0.1,localhost,*.vercel.app")
+
+ALLOWED_HOSTS = _split_csv_env(
+    "SYNERGETIC_ALLOWED_HOSTS",
+    "127.0.0.1,localhost,.vercel.app"
+)
 CSRF_TRUSTED_ORIGINS = _split_csv_env("SYNERGETIC_CSRF_TRUSTED_ORIGINS", "https://localhost,https://127.0.0.1,https://*.vercel.app")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 

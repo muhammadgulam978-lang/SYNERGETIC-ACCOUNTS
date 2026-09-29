@@ -2,6 +2,7 @@ import csv
 from decimal import Decimal
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -11,8 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import AccountForm, ApprovalRuleForm, BankAccountForm, BankStatementLineForm, BudgetForm, CampusForm, CashSessionForm, CostCentreForm, DocumentForm, FinancialPeriodForm, VoucherForm, VoucherLineFormSet
-from .models import Account, ApprovalRule, AuditEvent, BankAccount, BankStatementLine, Budget, Campus, CashSession, Document, FinancialPeriod, Voucher, VoucherLine
+from .forms import AccountForm, AccountUserCreationForm, ApprovalRuleForm, BankAccountForm, BankStatementLineForm, BudgetForm, CampusForm, CashSessionForm, CostCentreForm, DocumentForm, FinancialPeriodForm, NotificationForm, VoucherForm, VoucherLineFormSet
+from .models import Account, ApprovalRule, AuditEvent, BankAccount, BankStatementLine, Budget, Campus, CashSession, Document, FinancialPeriod, Notification, Voucher, VoucherLine
 from .services import approve_voucher, audit, ensure_setup, next_voucher_number, post_voucher, reverse_voucher, submit_voucher, validate_balanced
 
 
@@ -39,7 +40,7 @@ def _vouchers(request):
 def dashboard(request):
     ensure_setup()
     section = request.GET.get("section", "dashboard")
-    allowed = {"dashboard", "vouchers", "accounts", "parties", "cash-bank", "budgets", "documents", "reports", "audit", "settings"}
+    allowed = {"dashboard", "vouchers", "accounts", "parties", "cash-bank", "budgets", "documents", "tracking", "notifications", "users", "reports", "audit", "settings"}
     section = section if section in allowed else "dashboard"
     posted = VoucherLine.objects.filter(voucher__status="POSTED")
     debit_minus_credit = lambda q: _money(q.aggregate(v=Sum("debit") - Sum("credit"))["v"])
@@ -66,6 +67,12 @@ def dashboard(request):
         budget_rows.append({"budget": budget, "actual": actual, "remaining": budget.amount - actual})
 
     parties = Voucher.objects.exclude(party_name="").values("party_name").annotate(debits=Sum("lines__debit", filter=Q(status="POSTED")), credits=Sum("lines__credit", filter=Q(status="POSTED")), vouchers=Count("id", distinct=True)).order_by("party_name")
+    track_query = request.GET.get("track_q", "").strip()
+    tracked = Voucher.objects.select_related("campus", "created_by", "approved_by", "posted_by").prefetch_related("audit_events").all()
+    if track_query:
+        tracked = tracked.filter(Q(voucher_no__icontains=track_query) | Q(source_reference__icontains=track_query) | Q(party_name__icontains=track_query) | Q(narration__icontains=track_query))
+    inbox = Notification.objects.filter(recipient=request.user).select_related("sender", "voucher")
+    sent = Notification.objects.filter(sender=request.user).select_related("recipient", "voucher")
     context = {
         "section": section,
         "summary": {"cash": cash, "bank": bank, "income": income, "expenses": expenses, "receivables": receivables, "payables": payables, "pending": Voucher.objects.filter(status="SUBMITTED").count()},
@@ -83,9 +90,14 @@ def dashboard(request):
         "posted_vouchers": Voucher.objects.filter(status="POSTED")[:200],
         "budget_rows": budget_rows, "total_budget": _money(Budget.objects.aggregate(v=Sum("amount"))["v"]),
         "documents": Document.objects.select_related("voucher", "uploaded_by")[:200],
+        "tracked_vouchers": tracked[:100], "track_query": track_query,
+        "notification_tab": request.GET.get("tab", "inbox"), "inbox_notifications": inbox[:100], "sent_notifications": sent[:100],
+        "unread_notifications": inbox.filter(is_read=False).count(),
+        "account_users": get_user_model().objects.order_by("first_name", "username"),
         "periods": FinancialPeriod.objects.all(), "approval_rules": ApprovalRule.objects.select_related("campus"),
         "audit_events": AuditEvent.objects.select_related("voucher", "actor")[:200],
         "unmatched_bank_count": BankStatementLine.objects.filter(matched_voucher__isnull=True).count(),
+        "matched_bank_count": BankStatementLine.objects.filter(matched_voucher__isnull=False).count(),
     }
     return render(request, "ledger/dashboard.html", context)
 
@@ -181,6 +193,40 @@ def document_upload(request):
         messages.success(request, "File uploaded to the document vault.")
         return redirect(f"{reverse('ledger-dashboard')}?section=documents")
     return render(request, "ledger/record_form.html", {"form": form, "label": "Upload financial document", "section": "documents"})
+
+
+@login_required
+def notification_compose(request):
+    form = NotificationForm(request.POST or None)
+    if form.is_valid():
+        notification = form.save(commit=False)
+        notification.sender = request.user
+        notification.save()
+        messages.success(request, "Notification sent.")
+        return redirect(f"{reverse('ledger-dashboard')}?section=notifications&tab=sent")
+    return render(request, "ledger/record_form.html", {"form": form, "label": "Send notification", "section": "notifications"})
+
+
+@login_required
+def notification_read(request, pk):
+    notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save(update_fields=["is_read"])
+    return render(request, "ledger/notification_detail.html", {"notification": notification, "section": "notifications"})
+
+
+@login_required
+def user_create(request):
+    if not request.user.is_staff:
+        messages.error(request, "Only finance administrators can create user accounts.")
+        return redirect(f"{reverse('ledger-dashboard')}?section=users")
+    form = AccountUserCreationForm(request.POST or None)
+    if form.is_valid():
+        user = form.save()
+        messages.success(request, f"Account created for {user.get_full_name() or user.username}.")
+        return redirect(f"{reverse('ledger-dashboard')}?section=users")
+    return render(request, "ledger/record_form.html", {"form": form, "label": "Create user account", "section": "users"})
 
 
 @login_required

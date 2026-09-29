@@ -8,19 +8,19 @@ from django.utils import timezone
 from .models import Account, AuditEvent, Campus, CashSession, FinancialPeriod, Voucher, VoucherLine
 
 DEFAULT_ACCOUNTS = [
-    ("1000", "Cash in hand", "ASSET", "DEBIT"),
-    ("1100", "Business bank", "ASSET", "DEBIT"),
-    ("1200", "Accounts receivable", "ASSET", "DEBIT"),
+    ("1000", "Cash in Hand", "ASSET", "DEBIT"),
+    ("1100", "Bank", "ASSET", "DEBIT"),
+    ("1200", "Student Receivables", "ASSET", "DEBIT"),
     ("1300", "Inventory", "ASSET", "DEBIT"),
-    ("1500", "Fixed assets", "ASSET", "DEBIT"),
-    ("2000", "Accounts payable", "LIABILITY", "CREDIT"),
-    ("2100", "Payroll payable", "LIABILITY", "CREDIT"),
-    ("2200", "Tax payable", "LIABILITY", "CREDIT"),
-    ("3000", "Owner equity", "EQUITY", "CREDIT"),
-    ("4000", "Sales and service income", "INCOME", "CREDIT"),
-    ("4100", "Other income", "INCOME", "CREDIT"),
-    ("5000", "Payroll expense", "EXPENSE", "DEBIT"),
-    ("5100", "Operating expense", "EXPENSE", "DEBIT"),
+    ("1500", "Fixed Assets", "ASSET", "DEBIT"),
+    ("2000", "Vendor Payables", "LIABILITY", "CREDIT"),
+    ("2100", "Salary Payable", "LIABILITY", "CREDIT"),
+    ("2200", "Tax and Deduction Payable", "LIABILITY", "CREDIT"),
+    ("3000", "Capital Fund", "EQUITY", "CREDIT"),
+    ("4000", "Fee Income", "INCOME", "CREDIT"),
+    ("4100", "Other Income", "INCOME", "CREDIT"),
+    ("5000", "Salary Expense", "EXPENSE", "DEBIT"),
+    ("5100", "Operating Expense", "EXPENSE", "DEBIT"),
 ]
 
 
