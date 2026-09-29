@@ -285,3 +285,152 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.subject
+
+
+class FinanceRequest(models.Model):
+    TYPE_CHOICES = [("EXPENSE", "Expense claim"), ("BILL", "Bill / payment request"), ("PURCHASE", "Purchase request"), ("ADVANCE", "Employee advance")]
+    STATUS_CHOICES = [("DRAFT", "Draft"), ("SUBMITTED", "Submitted"), ("UNDER_REVIEW", "Under review"), ("APPROVED", "Approved"), ("REJECTED", "Rejected"), ("PAID", "Paid / issued"), ("SETTLED", "Settled"), ("POSTED", "Posted")]
+    PRIORITY_CHOICES = [("NORMAL", "Normal"), ("HIGH", "High"), ("URGENT", "Urgent")]
+    reference = models.CharField(max_length=40, unique=True)
+    request_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="DRAFT")
+    title = models.CharField(max_length=180)
+    purpose = models.TextField()
+    payee_name = models.CharField(max_length=160, blank=True)
+    department = models.CharField(max_length=120, blank=True)
+    campus = models.ForeignKey(Campus, on_delete=models.PROTECT, related_name="finance_requests")
+    cost_centre = models.ForeignKey(CostCentre, on_delete=models.PROTECT, null=True, blank=True, related_name="finance_requests")
+    expense_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="expense_requests")
+    payment_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="payment_requests")
+    request_date = models.DateField(default=date.today)
+    due_date = models.DateField(null=True, blank=True)
+    gross_amount = models.DecimalField(max_digits=16, decimal_places=2)
+    tax_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    withholding_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    net_amount = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default="NORMAL")
+    payment_reference = models.CharField(max_length=120, blank=True)
+    attachment = models.FileField(upload_to="requests/%Y/%m/", null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="finance_requests")
+    reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="reviewed_finance_requests")
+    current_approval_level = models.PositiveSmallIntegerField(default=0)
+    required_approval_level = models.PositiveSmallIntegerField(default=1)
+    rejection_reason = models.TextField(blank=True)
+    linked_voucher = models.OneToOneField(Voucher, on_delete=models.PROTECT, null=True, blank=True, related_name="finance_request")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["request_type", "status"]), models.Index(fields=["created_by", "status"]), models.Index(fields=["due_date"])]
+
+    def save(self, *args, **kwargs):
+        self.net_amount = (self.gross_amount or 0) + (self.tax_amount or 0) - (self.withholding_amount or 0)
+        total = (self.gross_amount or 0) + (self.tax_amount or 0)
+        self.required_approval_level = 3 if total >= 500000 else 2 if total >= 100000 else 1
+        super().save(*args, **kwargs)
+
+    @property
+    def total_amount(self):
+        return self.gross_amount + self.tax_amount
+
+    def __str__(self):
+        return f"{self.reference} · {self.title}"
+
+
+class FinanceRequestLine(models.Model):
+    request = models.ForeignKey(FinanceRequest, on_delete=models.CASCADE, related_name="items")
+    description = models.CharField(max_length=220)
+    quantity = models.DecimalField(max_digits=12, decimal_places=2, default=1)
+    unit_amount = models.DecimalField(max_digits=16, decimal_places=2)
+
+    @property
+    def total(self):
+        return self.quantity * self.unit_amount
+
+
+class RequestAttachment(models.Model):
+    request = models.ForeignKey(FinanceRequest, on_delete=models.CASCADE, related_name="attachments")
+    title = models.CharField(max_length=180)
+    file = models.FileField(upload_to="request-files/%Y/%m/")
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+
+class RequestApproval(models.Model):
+    ACTION_CHOICES = [("SUBMIT", "Submitted"), ("REVIEW", "Review started"), ("APPROVE", "Approved"), ("REJECT", "Rejected"), ("PAY", "Paid / issued"), ("SETTLE", "Settled"), ("POST", "Posted"), ("COMMENT", "Comment")]
+    request = models.ForeignKey(FinanceRequest, on_delete=models.CASCADE, related_name="workflow_events")
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    level = models.PositiveSmallIntegerField(default=0)
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class RequestComment(models.Model):
+    request = models.ForeignKey(FinanceRequest, on_delete=models.CASCADE, related_name="comments")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class RecurringExpense(models.Model):
+    FREQUENCY_CHOICES = [("MONTHLY", "Monthly"), ("QUARTERLY", "Quarterly"), ("YEARLY", "Yearly")]
+    title = models.CharField(max_length=180)
+    request_type = models.CharField(max_length=20, choices=[("EXPENSE", "Expense"), ("BILL", "Bill / payment")], default="BILL")
+    purpose = models.TextField()
+    payee_name = models.CharField(max_length=160, blank=True)
+    campus = models.ForeignKey(Campus, on_delete=models.PROTECT)
+    cost_centre = models.ForeignKey(CostCentre, on_delete=models.PROTECT, null=True, blank=True)
+    expense_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="recurring_expenses")
+    payment_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="recurring_payments")
+    amount = models.DecimalField(max_digits=16, decimal_places=2)
+    frequency = models.CharField(max_length=12, choices=FREQUENCY_CHOICES, default="MONTHLY")
+    next_due_date = models.DateField()
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    last_generated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["next_due_date"]
+
+
+class TaxRule(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    rate = models.DecimalField(max_digits=6, decimal_places=3)
+    withholding_rate = models.DecimalField(max_digits=6, decimal_places=3, default=0)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+
+class CloseChecklistItem(models.Model):
+    period = models.ForeignKey(FinancialPeriod, on_delete=models.CASCADE, related_name="close_items")
+    label = models.CharField(max_length=200)
+    is_complete = models.BooleanField(default=False)
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [models.UniqueConstraint(fields=["period", "label"], name="uniq_close_period_label")]
+
+
+class ImportBatch(models.Model):
+    STATUS_CHOICES = [("PENDING", "Pending"), ("COMPLETED", "Completed"), ("FAILED", "Failed")]
+    file = models.FileField(upload_to="imports/%Y/%m/")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PENDING")
+    imported_count = models.PositiveIntegerField(default=0)
+    error_log = models.TextField(blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)

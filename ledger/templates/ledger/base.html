@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
   <link rel="stylesheet" href="{% static 'ledger/css/app.css' %}">
   <link rel="stylesheet" href="{% static 'ledger/css/features.css' %}">
+  <link rel="stylesheet" href="{% static 'ledger/css/portal.css' %}">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -17,11 +18,13 @@
   <input class="nav-toggle" type="checkbox" id="navToggle" aria-hidden="true">
   <aside class="sidebar" id="sidebar">
     <a class="brand" href="{% url 'ledger-dashboard' %}"><span class="brand-mark"><i class="fa-solid fa-layer-group"></i></span><span><b>SYNERGETIC</b><small>ACCOUNTS</small></span></a>
-    <div class="company-switch"><span class="company-avatar">SS</span><div><b>Synergetic Solutions</b><small>Primary company</small></div><i class="fa-solid fa-chevron-down"></i></div>
+    <div class="company-switch"><span class="company-avatar">SS</span><div><b>Synergetic Solutions</b><small>{% if request.user.is_staff %}Admin review portal{% else %}Submitter portal{% endif %}</small></div><i class="fa-solid fa-chevron-down"></i></div>
     <nav>
       <span class="nav-label">Workspace</span>
       <a class="{% if section == 'dashboard' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=dashboard"><i class="fa-solid fa-grid-2"></i>Overview</a>
+      {% if request.user.is_staff %}
       <a class="{% if section == 'vouchers' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=vouchers"><i class="fa-solid fa-receipt"></i>Transactions</a>
+      <a class="{% if section == 'finance-requests' %}active{% endif %}" href="{% url 'finance-request-list' %}"><i class="fa-solid fa-clipboard-check"></i>Request review</a>
       <a class="{% if section == 'accounts' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=accounts"><i class="fa-solid fa-list-tree"></i>Chart of accounts</a>
       <a class="{% if section == 'parties' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=parties"><i class="fa-solid fa-address-book"></i>Parties</a>
       <span class="nav-label">Control</span>
@@ -34,11 +37,19 @@
       <a class="{% if section == 'audit' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=audit"><i class="fa-solid fa-shield-halved"></i>Audit log</a>
       <a class="{% if section == 'users' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=users"><i class="fa-solid fa-user-gear"></i>User accounts</a>
       <a class="{% if section == 'settings' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=settings"><i class="fa-solid fa-gear"></i>Setup</a>
+      <a class="{% if section == 'operations' %}active{% endif %}" href="{% url 'operations-centre' %}"><i class="fa-solid fa-gears"></i>Finance operations</a>
+      {% else %}
+      <a class="{% if section == 'submissions' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=submissions"><i class="fa-solid fa-file-invoice-dollar"></i>My submissions</a>
+      <a class="{% if section == 'finance-requests' %}active{% endif %}" href="{% url 'finance-request-list' %}"><i class="fa-solid fa-wallet"></i>Expenses &amp; requests</a>
+      <a class="{% if section == 'documents' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=documents"><i class="fa-solid fa-cloud-arrow-up"></i>Upload documents</a>
+      <a class="{% if section == 'tracking' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=tracking"><i class="fa-solid fa-route"></i>Track review</a>
+      <a class="{% if section == 'notifications' %}active{% endif %}" href="{% url 'ledger-dashboard' %}?section=notifications"><i class="fa-solid fa-inbox"></i>Admin messages{% if unread_notifications %}<span class="nav-count">{{ unread_notifications }}</span>{% endif %}</a>
+      {% endif %}
     </nav>
-    <div class="sidebar-foot"><span class="user-avatar">{{ request.user.username|first|upper }}</span><div><b>{{ request.user.get_full_name|default:request.user.username }}</b><small>Finance workspace</small></div><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button></form></div>
+    <div class="sidebar-foot"><span class="user-avatar">{{ request.user.username|first|upper }}</span><div><b>{{ request.user.get_full_name|default:request.user.username }}</b><small>{% if request.user.is_staff %}Finance administrator{% else %}Accounts submitter{% endif %}</small></div><form method="post" action="{% url 'logout' %}">{% csrf_token %}<button title="Sign out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button></form></div>
   </aside>
   <div class="workspace">
-    <header class="topbar"><label class="menu-button" for="navToggle" aria-label="Open menu" aria-controls="sidebar"><i class="fa-solid fa-bars"></i></label><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="globalSearch" placeholder="Search this page"><kbd>⌘ K</kbd></div><div class="top-actions"><span class="live-pill"><i></i> PostgreSQL connected</span><button class="icon-button"><i class="fa-regular fa-bell"></i></button><a class="primary-button" href="{% url 'voucher-create' %}"><i class="fa-solid fa-plus"></i> New transaction</a></div></header>
+    <header class="topbar"><label class="menu-button" for="navToggle" aria-label="Open menu" aria-controls="sidebar"><i class="fa-solid fa-bars"></i></label><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="globalSearch" placeholder="Search this page"><kbd>⌘ K</kbd></div><div class="top-actions"><span class="live-pill"><i></i> PostgreSQL connected</span><a class="icon-button" href="{% url 'ledger-dashboard' %}?section=notifications" title="Notifications"><i class="fa-regular fa-bell"></i></a><a class="primary-button" href="{% if request.user.is_staff %}{% url 'voucher-create' %}{% else %}{% url 'finance-request-create' %}{% endif %}"><i class="fa-solid fa-plus"></i> {% if request.user.is_staff %}New transaction{% else %}New request{% endif %}</a></div></header>
     {% if messages %}<div class="message-stack">{% for message in messages %}<div class="message {{ message.tags }}"><i class="fa-solid fa-circle-check"></i>{{ message }}</div>{% endfor %}</div>{% endif %}
     {% block content %}{% endblock %}
   </div>

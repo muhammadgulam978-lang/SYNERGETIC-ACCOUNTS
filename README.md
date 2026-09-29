@@ -14,12 +14,12 @@ cd 'D:\synergetic accounts'
 
 Open `http://127.0.0.1:8090`.
 
-Local bootstrap login:
+Local bootstrap logins:
 
-- Username: `admin`
-- Password: `Synergetic@2026`
+- Admin review portal: `admin` / `Synergetic@2026`
+- User submitter portal: `accounts.user` / `Synergetic@2026`
 
-Change the password from Django admin before real use. The secondary `accounts.maker` user exists to exercise maker/approver controls.
+Change both passwords before real use. The secondary `accounts.maker` finance user exists to exercise maker/approver controls.
 
 ## Included
 
@@ -33,3 +33,20 @@ Change the password from Django admin before real use. The secondary `accounts.m
 - Admin-controlled creation of new finance user accounts
 - Trial balance and general-ledger CSV exports
 - Immutable audit history and role-aware approval controls
+- Separate admin and submitter portals with server-side record isolation
+- Automatic admin alerts on new submissions/uploads and user alerts on approval, rejection, posting or reversal
+- Unified expense claims, bill/payment requests, purchase requests and employee advances
+- Amount-based multi-level approvals, correction/resubmission, comments and supporting files
+- Automatic posting of approved payments into the existing double-entry voucher ledger
+- Recurring expense schedules, due/overdue reminders, tax/withholding rules and month-end checklist
+- Controlled CSV import for bulk draft requests
+
+## Finance automation
+
+To generate due recurring drafts and send overdue reminders (normally scheduled daily):
+
+```powershell
+.\.venv\Scripts\python.exe manage.py process_finance_automation
+```
+
+CSV request imports accept: `type,title,purpose,payee,department,amount`. Supported types are `EXPENSE`, `BILL`, `PURCHASE` and `ADVANCE`.
