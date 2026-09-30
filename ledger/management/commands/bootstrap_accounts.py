@@ -15,16 +15,27 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--password", default="Synergetic@2026")
+        parser.add_argument(
+            "--reset-passwords",
+            action="store_true",
+            help="Reset bootstrap user passwords even when the users already exist.",
+        )
 
     def handle(self, *args, **options):
         User = get_user_model()
-        owner, _ = User.objects.get_or_create(username="admin", defaults={"first_name": "Finance", "last_name": "Owner", "email": "accounts@synergetic.local", "is_staff": True, "is_superuser": True})
-        owner.set_password(options["password"]); owner.save()
-        maker, _ = User.objects.get_or_create(username="accounts.maker", defaults={"first_name": "Accounts", "last_name": "Maker", "is_staff": True})
-        maker.set_password(options["password"]); maker.save()
-        submitter, _ = User.objects.get_or_create(username="accounts.user", defaults={"first_name": "Accounts", "last_name": "Submitter", "email": "submitter@synergetic.local", "is_staff": False})
+        owner, owner_created = User.objects.get_or_create(username="admin", defaults={"first_name": "Finance", "last_name": "Owner", "email": "accounts@synergetic.local", "is_staff": True, "is_superuser": True})
+        if owner_created or options["reset_passwords"]:
+            owner.set_password(options["password"])
+            owner.save(update_fields=["password"])
+        maker, maker_created = User.objects.get_or_create(username="accounts.maker", defaults={"first_name": "Accounts", "last_name": "Maker", "is_staff": True})
+        if maker_created or options["reset_passwords"]:
+            maker.set_password(options["password"])
+            maker.save(update_fields=["password"])
+        submitter, submitter_created = User.objects.get_or_create(username="accounts.user", defaults={"first_name": "Accounts", "last_name": "Submitter", "email": "submitter@synergetic.local", "is_staff": False})
         submitter.is_staff = False
-        submitter.set_password(options["password"]); submitter.save()
+        if submitter_created or options["reset_passwords"]:
+            submitter.set_password(options["password"])
+        submitter.save()
         admin_group, _ = Group.objects.get_or_create(name="Finance Admin")
         submitter_group, _ = Group.objects.get_or_create(name="Accounts Submitter")
         owner.groups.add(admin_group); maker.groups.add(admin_group); submitter.groups.add(submitter_group)
