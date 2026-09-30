@@ -7,7 +7,7 @@ from django.http.request import validate_host
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
-from synergetic_accounts.settings import _allowed_hosts
+from synergetic_accounts.settings import _allowed_hosts, _postgres_config_from_url
 
 from .models import Document, FinanceRequest, Notification, Voucher, VoucherLine
 from .services import approve_finance_request, approve_voucher, ensure_setup, next_request_reference, next_voucher_number, pay_and_post_finance_request, post_voucher, submit_finance_request, submit_voucher
@@ -28,6 +28,37 @@ class AllowedHostsTests(SimpleTestCase):
 
             reloaded = reload(settings_module)
             self.assertEqual(reloaded.DATABASES["default"]["ENGINE"], "django.db.backends.sqlite3")
+
+    def test_managed_postgres_url_is_parsed_with_ssl(self):
+        with patch.dict("os.environ", {"VERCEL": "1"}, clear=True):
+            config = _postgres_config_from_url(
+                "postgresql://finance%2Euser:secret%21@ep-example.neon.tech:5432/accounts?sslmode=require"
+            )
+
+        self.assertEqual(config["NAME"], "accounts")
+        self.assertEqual(config["USER"], "finance.user")
+        self.assertEqual(config["PASSWORD"], "secret!")
+        self.assertEqual(config["HOST"], "ep-example.neon.tech")
+        self.assertEqual(config["OPTIONS"]["sslmode"], "require")
+        self.assertEqual(config["CONN_MAX_AGE"], 0)
+
+    def test_vercel_uses_database_url_and_disables_debug_by_default(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "VERCEL": "1",
+                "DATABASE_URL": "postgresql://user:pass@database.example/accounts",
+            },
+            clear=True,
+        ):
+            from importlib import reload
+            import synergetic_accounts.settings as settings_module
+
+            reloaded = reload(settings_module)
+
+        self.assertFalse(reloaded.DEBUG)
+        self.assertEqual(reloaded.DATABASES["default"]["HOST"], "database.example")
+        self.assertEqual(reloaded.DATABASES["default"]["OPTIONS"]["sslmode"], "require")
 
 
 class SynergeticAccountsTests(TestCase):

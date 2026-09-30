@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import parse_qsl, unquote, urlparse
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -37,8 +38,45 @@ def _allowed_hosts() -> list[str]:
     return _normalize_allowed_hosts(hosts)
 
 
+def _first_database_url() -> str:
+    """Return the first managed-Postgres URL exposed by common Vercel integrations."""
+    for var_name in (
+        "DATABASE_URL",
+        "POSTGRES_URL",
+        "POSTGRES_PRISMA_URL",
+        "POSTGRES_URL_NON_POOLING",
+    ):
+        value = os.environ.get(var_name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _postgres_config_from_url(database_url: str) -> dict:
+    parsed = urlparse(database_url)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        raise ValueError("The database URL must use the postgres or postgresql scheme.")
+
+    options = dict(parse_qsl(parsed.query, keep_blank_values=False))
+    hostname = parsed.hostname or ""
+    if hostname not in {"", "127.0.0.1", "localhost"}:
+        options.setdefault("sslmode", "require")
+
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": unquote(parsed.path.lstrip("/")),
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
+        "HOST": hostname,
+        "PORT": str(parsed.port or 5432),
+        "CONN_MAX_AGE": int(os.environ.get("SYNERGETIC_DB_CONN_MAX_AGE", "0" if _env_bool("VERCEL") else "60")),
+        "CONN_HEALTH_CHECKS": True,
+        "OPTIONS": options,
+    }
+
+
 SECRET_KEY = os.environ.get("SYNERGETIC_SECRET_KEY", "local-development-key-change-before-production")
-DEBUG = _env_bool("SYNERGETIC_DEBUG", default=True)
+DEBUG = _env_bool("SYNERGETIC_DEBUG", default=not _env_bool("VERCEL"))
 
 ALLOWED_HOSTS = _allowed_hosts()
 CSRF_TRUSTED_ORIGINS = _split_csv_env(
@@ -87,7 +125,10 @@ TEMPLATES = [{
 }]
 WSGI_APPLICATION = "synergetic_accounts.wsgi.application"
 
-if not _env_bool("SYNERGETIC_USE_SQLITE", default=False):
+DATABASE_URL = _first_database_url()
+if DATABASE_URL:
+    DATABASES = {"default": _postgres_config_from_url(DATABASE_URL)}
+elif not _env_bool("SYNERGETIC_USE_SQLITE", default=False):
     DATABASES = {"default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("SYNERGETIC_DB_NAME", "synergetic_accounts"),
@@ -95,7 +136,8 @@ if not _env_bool("SYNERGETIC_USE_SQLITE", default=False):
         "PASSWORD": os.environ.get("SYNERGETIC_DB_PASSWORD", ""),
         "HOST": os.environ.get("SYNERGETIC_DB_HOST", "127.0.0.1"),
         "PORT": os.environ.get("SYNERGETIC_DB_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
+        "CONN_MAX_AGE": int(os.environ.get("SYNERGETIC_DB_CONN_MAX_AGE", "0" if _env_bool("VERCEL") else "60")),
+        "CONN_HEALTH_CHECKS": True,
     }}
 else:
     DATABASES = {"default": {
