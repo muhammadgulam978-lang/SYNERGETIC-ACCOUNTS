@@ -158,3 +158,12 @@ class SynergeticAccountsTests(TestCase):
         self.assertNotContains(response, "Admin bill")
         self.assertEqual(self.client.get(reverse("finance-request-detail", args=[private.pk])).status_code, 404)
         self.assertEqual(self.client.get(reverse("operations-centre")).status_code, 302)
+
+    def test_finance_request_form_uses_responsive_styled_grid(self):
+        self.client.force_login(self.submitter)
+        response = self.client.get(reverse("finance-request-create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="app-form form-grid request-form-grid"')
+        self.assertContains(response, 'class="request-field field-purpose wide"')
+        self.assertContains(response, 'class="line-row"', count=3)

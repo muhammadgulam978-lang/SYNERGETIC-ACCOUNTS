@@ -1,1 +1,69 @@
-{% extends 'ledger/base.html' %}{% block title %}{% if item %}Edit {{ item.reference }}{% else %}New finance request{% endif %} · Synergetic Accounts{% endblock %}{% block content %}<main class="page"><div class="page-heading"><div><span class="eyebrow">SUBMISSION WORKSPACE</span><h1>{% if item %}Edit {{ item.reference }}{% else %}Create finance request{% endif %}</h1><p>Use one controlled form for an expense, bill/payment, purchase or employee advance.</p></div><a class="secondary-button" href="{% url 'finance-request-list' %}"><i class="fa-solid fa-arrow-left"></i> Requests</a></div><form method="post" enctype="multipart/form-data" class="panel form-panel">{% csrf_token %}{% if form.non_field_errors %}<div class="message error">{{ form.non_field_errors }}</div>{% endif %}<div class="form-grid">{% for field in form %}<label class="{% if field.name == 'purpose' or field.name == 'attachment' %}wide{% endif %}"><span>{{ field.label }}</span>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</label>{% endfor %}</div><div class="panel-head line-heading"><div><span class="eyebrow">OPTIONAL ITEMIZATION</span><h2>Request items</h2></div><small>If items are entered, their total becomes the gross amount.</small></div>{{ formset.management_form }}<div class="line-formset">{% for line in formset %}<div class="line-row">{% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}<label>Description{{ line.description }}</label><label>Quantity{{ line.quantity }}</label><label>Unit amount{{ line.unit_amount }}</label><label class="delete-line">Remove {{ line.DELETE }}</label></div>{% endfor %}</div><div class="form-actions"><a href="{% url 'finance-request-list' %}">Cancel</a><button class="primary-button" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save draft</button></div></form></main>{% endblock %}
+{% extends 'ledger/base.html' %}
+
+{% block title %}{% if item %}Edit {{ item.reference }}{% else %}New finance request{% endif %} · Synergetic Accounts{% endblock %}
+
+{% block content %}
+<main class="page request-editor">
+  <div class="page-heading">
+    <div>
+      <span class="eyebrow">SUBMISSION WORKSPACE</span>
+      <h1>{% if item %}Edit {{ item.reference }}{% else %}Create finance request{% endif %}</h1>
+      <p>Use one controlled form for an expense, bill/payment, purchase or employee advance.</p>
+    </div>
+    <a class="secondary-button" href="{% url 'finance-request-list' %}"><i class="fa-solid fa-arrow-left"></i> Requests</a>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="panel form-panel request-form-panel">
+    {% csrf_token %}
+    <div class="panel-head request-panel-head">
+      <div>
+        <span class="eyebrow">REQUEST INFORMATION</span>
+        <h2>Expense and payment details</h2>
+        <p>Complete the required fields and attach the supporting document, if available.</p>
+      </div>
+      <span class="required-note"><i class="fa-solid fa-asterisk"></i> Required fields</span>
+    </div>
+
+    {% if form.non_field_errors %}<div class="message error">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="app-form form-grid request-form-grid">
+      {% for field in form %}
+      <label class="request-field field-{{ field.name }} {% if field.name == 'purpose' or field.name == 'attachment' %}wide{% endif %}">
+        <span>{{ field.label }}{% if field.field.required %}<em>*</em>{% endif %}</span>
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for error in field.errors %}<small class="field-error">{{ error }}</small>{% endfor %}
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="panel-head line-heading">
+      <div>
+        <span class="eyebrow">OPTIONAL ITEMIZATION</span>
+        <h2>Request items</h2>
+      </div>
+      <small>If items are entered, their total becomes the gross amount.</small>
+    </div>
+
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}<div class="message error">{{ formset.non_form_errors }}</div>{% endif %}
+    <div class="line-formset">
+      {% for line in formset %}
+      <div class="line-row">
+        {% for hidden in line.hidden_fields %}{{ hidden }}{% endfor %}
+        <label class="line-description"><span>Description</span>{{ line.description }}{{ line.description.errors }}</label>
+        <label class="line-quantity"><span>Quantity</span>{{ line.quantity }}{{ line.quantity.errors }}</label>
+        <label class="line-amount"><span>Unit amount</span>{{ line.unit_amount }}{{ line.unit_amount.errors }}</label>
+        <label class="delete-line"><span>Remove</span>{{ line.DELETE }}</label>
+        {{ line.non_field_errors }}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="form-actions request-actions">
+      <a class="secondary-button" href="{% url 'finance-request-list' %}">Cancel</a>
+      <button class="primary-button" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save draft</button>
+    </div>
+  </form>
+</main>
+{% endblock %}
